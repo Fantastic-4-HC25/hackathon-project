@@ -1,97 +1,101 @@
-// app/(protected)/dashboard/[role]/page.jsx
+// app/dashboard/[role]/page.jsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import AddPropertyModal from "@/components/AddPropertyModal";
+import ListingsSection from "@/components/ListingsSection";
+import AIRecommendations from "@/components/AIRecommendations";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
-    const { role } = useParams();
+    const params = useParams();
+    const role = params?.role; // dynamic role from URL
     const router = useRouter();
-    const [userData, setUserData] = useState(null);
-    const [loading, setLoading] = useState(true);
 
+    const [userData, setUserData] = useState(null);
+    const [listings, setListings] = useState([]);
+    const [loadingUser, setLoadingUser] = useState(true);
+    const [loadingListings, setLoadingListings] = useState(true);
+
+    // Get logged-in user and ensure correct role route
     useEffect(() => {
-        const fetchData = async () => {
+        const run = async () => {
             const user = auth.currentUser;
-            if (!user) return;
+            if (!user) return router.replace("/login");
 
             const snap = await getDoc(doc(db, "users", user.uid));
-            if (!snap.exists()) return;
+            if (!snap.exists()) return router.replace("/select-role");
 
-            const data = snap.data();
-            if (data.role !== role) {
-                router.replace(`/dashboard/${data.role}`);
-                return;
+            const data = { id: user.uid, email: user.email, ...snap.data() };
+
+            // Normalize route if mismatch
+            if (data.role && data.role !== role) {
+                return router.replace(`/dashboard/${data.role}`);
             }
+
             setUserData(data);
-            setLoading(false);
+            setLoadingUser(false);
         };
 
-        fetchData();
+        run();
     }, [role, router]);
 
-    if (loading) {
+    // Realtime "available" listings
+    useEffect(() => {
+        const q = query(collection(db, "properties"), where("status", "==", "available"));
+        const unsub = onSnapshot(
+            q,
+            (snap) => {
+                setListings(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+                setLoadingListings(false);
+            },
+            () => setLoadingListings(false)
+        );
+        return () => unsub();
+    }, []);
+
+    if (loadingUser) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <Loader2 className="animate-spin w-6 h-6 text-muted-foreground" />
+            <div className="flex items-center justify-center h-screen text-muted-foreground">
+                Loading dashboard…
             </div>
         );
     }
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-6">
-            <h1 className="text-3xl font-bold">Welcome, {userData.role}</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-bold">Welcome, {userData?.role}</h1>
+                <Button onClick={() => router.push(`/profile/${auth.currentUser.uid}`)}>
+                    View My Profile
+                </Button>
+            </div>
 
-            {role === "tenant" ? (
-                <TenantDashboard data={userData.preferences} />
-            ) : (
-                <LandlordDashboard data={userData.landlordProperties} />
+            {/* Tenant-only: AI recommendations */}
+            {userData?.role === "tenant" && (
+                <AIRecommendations properties={listings} />
             )}
 
-            <div className="pt-6">
-                <Button onClick={() => router.push("/settings")}>Go to Settings</Button>
-            </div>
+            {/* Landlord-only: add property modal */}
+            {userData?.role === "landlord" && (
+                <div className="flex justify-end">
+                    <AddPropertyModal
+                        onCreated={(created) => {
+                            // Optimistic update while waiting for onSnapshot
+                            setListings((prev) => [
+                                { ...created, id: created.__tempId || Math.random().toString(36).slice(2) },
+                                ...prev,
+                            ]);
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* Shared: property listings */}
+            <ListingsSection listings={listings} loading={loadingListings} />
         </div>
-    );
-}
-
-function TenantDashboard({ data }) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Your Preferences</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p><strong>Budget:</strong> {data?.budget || "Not set"}</p>
-                <p><strong>Location:</strong> {data?.desiredLocation || "Not set"}</p>
-                <p><strong>Lifestyle:</strong> {data?.lifestyle || "Not set"}</p>
-                <p><strong>Property Type:</strong> {data?.propertyType || "Not set"}</p>
-            </CardContent>
-        </Card>
-    );
-}
-
-function LandlordDashboard({ data }) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Your Properties</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {Array.isArray(data) && data.length > 0
-                    ? data.map((p, i) => (
-                        <div key={i} className="border-b py-2">
-                            <p><strong>Location:</strong> {p.propertyLocation}</p>
-                            <p><strong>Type:</strong> {p.propertyType}</p>
-                        </div>
-                    ))
-                    : <p>No properties yet.</p>}
-            </CardContent>
-        </Card>
     );
 }
