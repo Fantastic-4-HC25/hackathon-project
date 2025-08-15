@@ -69,7 +69,7 @@ export default function DashboardPage() {
         <div className="max-w-5xl mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold">Welcome, {userData?.role}</h1>
-                <Button onClick={() => router.push(`/profile/${auth.currentUser.uid}`)}>
+                <Button onClick={() => router.push(`/profile`)}>
                     View My Profile
                 </Button>
             </div>
