@@ -20,7 +20,7 @@ export default function Home() {
           Find Your Perfect Rental Match
         </h1>
         <p className="text-lg text-gray-600 max-w-xl text-center mb-8">
-          Whether you're a tenant looking for the ideal home or a landlord finding the right tenant, RentMatch makes the process seamless and stress-free.
+          Whether you're a tenant looking for the ideal home or a landlord finding the right tenant, Fantastic Rental makes the process seamless and stress-free.
         </p>
 
         <div className="flex gap-4">
