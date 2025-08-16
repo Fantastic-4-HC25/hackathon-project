@@ -120,7 +120,7 @@ export function LoginForm() {
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full bg-blue-700 hover:bg-blue-800" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           <Mail className="mr-2 h-4 w-4" />
           Log In
